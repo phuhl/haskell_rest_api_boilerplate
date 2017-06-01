@@ -1,8 +1,15 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
+
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE DataKinds #-}
 
 module RestServer
     (
@@ -16,6 +23,7 @@ import           Control.Monad.Except        (ExceptT, MonadError)
 
 import           Servant
 import           Servant.API
+import           Servant.Utils.Enter
 import           Network.Wai.Handler.Warp (run,Port)
 import           Network.Wai.Middleware.RequestLogger (logStdout, logStdoutDev)
 
@@ -26,17 +34,26 @@ newtype App config a
                  MonadError ServantErr, MonadIO)
 
 
+type UsersAPI =
+  "v1" :> "tabs" :> Get '[JSON] String
+
+
+
 convertApp :: config -> (App config) :~> ExceptT ServantErr IO
 convertApp cfg = Nat (flip runReaderT cfg . runApp)
 
-appToServer :: config -> ServerT api (App config) -> Server api
-appToServer config serverApi = enter (convertApp config) serverApi
+appToServer :: (Enter (ServerT api (App config))
+                ((App config) :~> ExceptT ServantErr IO) (Server api))
+            => config -> ServerT api (App config) -> Server api
+appToServer config serverApi = enter (convertApp config) (serverApi)
 
 api :: Proxy api
 api = Proxy
 
-app :: config -> ServerT api (App config) -> Application
-app config serverApi = serve api $ appToServer config serverApi
+app :: (Enter (ServerT api (App config))
+                ((App config) :~> ExceptT ServantErr IO) (Server api))
+       => config -> ServerT api (App config) -> Application
+app config serverApi = serve (api :: Proxy api) $ appToServer config serverApi
 
 createRestServer :: Port -> ServerT api (App config) -> config -> IO ()
 createRestServer port serverApi config = do
