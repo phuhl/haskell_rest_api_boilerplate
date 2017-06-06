@@ -8,9 +8,11 @@
 module RestServer
     (
       createRestServer,
-      App(..)
+      App(..),
+      Environment(..)
     ) where
 
+import RestServer.Environment
 
 import Control.Monad.Reader (MonadIO, MonadReader, ReaderT
                             , runReaderT, asks, liftIO)
@@ -18,8 +20,10 @@ import Control.Monad.Except (ExceptT, MonadError)
 import Servant              (Server, ServerT, HasServer
                             , ServantErr, Proxy, serve)
 import Servant.Utils.Enter  (Enter, (:~>)(..), enter)
-import Network.Wai.Handler.Warp (run,Port)
+import Network.Wai (Middleware(..))
 import Network.Wai.Middleware.RequestLogger (logStdout, logStdoutDev)
+import Network.Wai.Handler.Warp (run,Port)
+
 
 
 newtype App config a
@@ -32,26 +36,22 @@ newtype App config a
 convertApp :: config -> (App config) :~> ExceptT ServantErr IO
 convertApp cfg = Nat (flip runReaderT cfg . runApp)
 
+setLogger :: Environment -> Middleware
+setLogger Test = id
+setLogger Development = logStdoutDev
+setLogger Production = logStdout
+
 createRestServer :: ((Enter
                       (ServerT api (App config))
                       ((App config) :~> ExceptT ServantErr IO)
                       (Server api)
                      )
                     , (HasServer api '[]))
-  => Port -> config -> Proxy api -> ServerT api (App config)
+  => Port -> Environment -> config -> Proxy api
+  -> ServerT api (App config)
   -> IO ()
-createRestServer port config proxy serverApi =
+createRestServer port environment config proxy serverApi =
   run port
-  $ logStdout
+  $ setLogger environment
   $ serve proxy
   $ enter (convertApp config) (serverApi)
-
-
-{-startServer :: Environment -> IO ()
-startServer e = do
-  (pool, logger, config) <- getAllConfigs e
-  runSqlPool (runMigration usersMigration) pool
-  let port = confPort config
-  runStdoutLoggingT $ do logInfoN $ Text.pack $ "Listening on port " ++ show port
-  run port $ logger $ app config
--}

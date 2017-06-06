@@ -16,6 +16,12 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     RestServer
+                     , RestServer.Config
+                     , RestServer.ConfigReader
+                     , RestServer.Persistent
+                     , RestServer.Persistent.Postgresql
+                     , RestServer.Persistent.Postgresql.Config
+                     , RestServer.Environment
   build-depends:       base >= 4.7 && < 5
                      , mtl
                      , servant
@@ -24,6 +30,11 @@ library
                      , wai
                      , wai-extra
                      , monad-logger
+                     , resource-pool
+                     , persistent
+                     , persistent-postgresql
+                     , bytestring
+                     , ConfigFile
 
   default-language:    Haskell2010
 
@@ -37,6 +48,8 @@ executable rest-server-exe
                      , rest-server
                      , servant
                      , servant-server
+                     , persistent-postgresql
+                     , ConfigFile
 
   default-language:    Haskell2010
 
